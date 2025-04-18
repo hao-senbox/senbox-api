@@ -12,10 +12,10 @@ import (
 	"gorm.io/gorm"
 )
 
-func setupCompanyRoutes(engine *gin.Engine, dbConn *gorm.DB, config config.AppConfig) {
-	companyController := &controller.CompanyController{
-		GetCompanyUseCase: &usecase.GetCompanyUseCase{
-			CompanyRepository: &repository.CompanyRepository{DBConn: dbConn},
+func setupOrganizationRoutes(engine *gin.Engine, dbConn *gorm.DB, config config.AppConfig) {
+	companyController := &controller.OrganizationController{
+		GetOrganizationUseCase: &usecase.GetOrganizationUseCase{
+			OrganizationRepository: &repository.OrganizationRepository{DBConn: dbConn},
 		},
 	}
 
@@ -27,8 +27,8 @@ func setupCompanyRoutes(engine *gin.Engine, dbConn *gorm.DB, config config.AppCo
 
 	secureMiddleware := middleware.SecuredMiddleware{SessionRepository: sessionRepository}
 
-	user := engine.Group("v1/company")
+	user := engine.Group("v1/organization")
 	{
-		user.GET("/:id", secureMiddleware.Secured(), companyController.GetCompanyById)
+		user.GET("/:id", secureMiddleware.Secured(), companyController.GetOrganizationById)
 	}
 }
