@@ -10,8 +10,8 @@ type GetRoleUseCase struct {
 	*repository.RoleRepository
 }
 
-func (receiver *GetRoleUseCase) GetAllRole() ([]entity.SRole, error) {
-	return receiver.GetAll()
+func (receiver *GetRoleUseCase) GetAllRoleByOrganization(organizationId int64) ([]entity.SRole, error) {
+	return receiver.GetAllByOrganization(organizationId)
 }
 
 func (receiver *GetRoleUseCase) GetRoleById(req request.GetRoleByIdRequest) (*entity.SRole, error) {

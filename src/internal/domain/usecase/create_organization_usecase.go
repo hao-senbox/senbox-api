@@ -5,10 +5,10 @@ import (
 	"sen-global-api/internal/domain/request"
 )
 
-type CreateUserEntityUseCase struct {
-	*repository.UserEntityRepository
+type CreateOrganizationUseCase struct {
+	*repository.OrganizationRepository
 }
 
-func (receiver *CreateUserEntityUseCase) CreateUserEntity(req request.CreateUserEntityRequest) error {
-	return receiver.CreateUser(req)
+func (receiver *CreateOrganizationUseCase) CreateOrganization(req request.CreateOrganizationRequest) error {
+	return receiver.OrganizationRepository.CreateOrganization(req)
 }

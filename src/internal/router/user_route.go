@@ -35,12 +35,6 @@ func setupUserRoutes(engine *gin.Engine, dbConn *gorm.DB, config config.AppConfi
 		},
 	}
 
-	userConfigController := &controller.UserConfigController{
-		GetUserConfigUseCase: &usecase.GetUserConfigUseCase{
-			UserConfigRepository: &repository.UserConfigRepository{DBConn: dbConn},
-		},
-	}
-
 	userRoleController := &controller.RoleController{
 		GetRoleUseCase: &usecase.GetRoleUseCase{
 			RoleRepository: &repository.RoleRepository{DBConn: dbConn},
@@ -71,20 +65,21 @@ func setupUserRoutes(engine *gin.Engine, dbConn *gorm.DB, config config.AppConfi
 		},
 	}
 
-	rolePolicyController := &controller.RolePolicyController{
-		GetRolePolicyUseCase: &usecase.GetRolePolicyUseCase{
-			RolePolicyRepository: &repository.RolePolicyRepository{DBConn: dbConn},
+	roleClaimPermissionController := &controller.RoleClaimPermissionController{
+		GetRoleClaimPermissionUseCase: &usecase.GetRoleClaimPermissionUseCase{
+			RoleClaimPermissionRepository: &repository.RoleClaimPermissionRepository{DBConn: dbConn},
 		},
-		CreateRolePolicyUseCase: &usecase.CreateRolePolicyUseCase{
-			RolePolicyRepository: &repository.RolePolicyRepository{DBConn: dbConn},
+		CreateRoleClaimPermissionUseCase: &usecase.CreateRoleClaimPermissionUseCase{
+			RoleClaimPermissionRepository: &repository.RoleClaimPermissionRepository{DBConn: dbConn},
 		},
-		UpdateRolePolicyUseCase: &usecase.UpdateRolePolicyUseCase{
-			RolePolicyRepository: &repository.RolePolicyRepository{DBConn: dbConn},
+		UpdateRoleClaimPermissionUseCase: &usecase.UpdateRoleClaimPermissionUseCase{
+			RoleClaimPermissionRepository: &repository.RoleClaimPermissionRepository{DBConn: dbConn},
 		},
-		DeleteRolePolicyUseCase: &usecase.DeleteRolePolicyUseCase{
-			RolePolicyRepository: &repository.RolePolicyRepository{DBConn: dbConn},
+		DeleteRoleClaimPermissionUseCase: &usecase.DeleteRoleClaimPermissionUseCase{
+			RoleClaimPermissionRepository: &repository.RoleClaimPermissionRepository{DBConn: dbConn},
 		},
 	}
+
 	userAccess := engine.Group("v1/")
 	{
 		loginController := &controller.LoginController{DBConn: dbConn,
@@ -106,16 +101,12 @@ func setupUserRoutes(engine *gin.Engine, dbConn *gorm.DB, config config.AppConfi
 
 		user.POST("/init", userEntityController.CreateUserEntity)
 		user.POST("/update", userEntityController.UpdateUserEntity)
-	}
-
-	userConfig := engine.Group("v1/user-config")
-	{
-		userConfig.GET("/:id", userConfigController.GetUserConfigById)
+		user.POST("/role/update", userEntityController.UpdateUserRole)
 	}
 
 	userRole := engine.Group("v1/user-role")
 	{
-		userRole.GET("/all", userRoleController.GetAllRole)
+		userRole.GET("/:organization_id/all", userRoleController.GetAllRoleByOrganization)
 		userRole.GET("/:id", userRoleController.GetRoleById)
 		userRole.GET("/name/:role_name", userRoleController.GetRoleByName)
 
@@ -138,15 +129,15 @@ func setupUserRoutes(engine *gin.Engine, dbConn *gorm.DB, config config.AppConfi
 		roleClaim.DELETE("/:id", roleClaimController.DeleteRoleClaim)
 	}
 
-	rolePolicy := engine.Group("v1/role-policy")
+	roleClaimPermission := engine.Group("v1/role-policy")
 	{
-		rolePolicy.GET("/all", rolePolicyController.GetAllRolePolicy)
-		rolePolicy.GET("/:id", rolePolicyController.GetRolePolicyById)
-		rolePolicy.GET("/name/:policy_name", rolePolicyController.GetRolePolicyByName)
+		roleClaimPermission.GET("/all", roleClaimPermissionController.GetAllRoleClaimPermission)
+		roleClaimPermission.GET("/:id", roleClaimPermissionController.GetRoleClaimPermissionById)
+		roleClaimPermission.GET("/name/:policy_name", roleClaimPermissionController.GetRoleClaimPermissionByName)
 
-		rolePolicy.POST("/init", rolePolicyController.CreateRolePolicy)
-		rolePolicy.POST("/", rolePolicyController.UpdateRolePolicy)
+		roleClaimPermission.POST("/init", roleClaimPermissionController.CreateRoleClaimPermission)
+		roleClaimPermission.POST("/", roleClaimPermissionController.UpdateRoleClaimPermission)
 
-		rolePolicy.DELETE("/:id", rolePolicyController.DeleteRolePolicy)
+		roleClaimPermission.DELETE("/:id", roleClaimPermissionController.DeleteRoleClaimPermission)
 	}
 }

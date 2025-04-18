@@ -11,7 +11,6 @@ type UpdateUserEntityRequest struct {
 	UserConfig *uint     `json:"user_config"`
 	Guardians  *[]string `json:"guardians"`
 	Roles      *[]string `json:"roles"`
-	Policies   *[]uint   `json:"policies"`
 	Devices    *[]string `json:"devices"`
 }
 

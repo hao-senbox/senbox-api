@@ -12,4 +12,6 @@ type SRoleClaim struct {
 	Role       SRole     `gorm:"foreignKey:RoleId;references:id;constraint:OnDelete:CASCADE"`
 	CreatedAt  time.Time `gorm:"default:CURRENT_TIMESTAMP;not null"`
 	UpdatedAt  time.Time `gorm:"default:CURRENT_TIMESTAMP;not null"`
+
+	ClaimPermissions []SRoleClaimPermission `gorm:"foreignKey:role_claim_id;references:id;constraint:OnDelete:CASCADE"`
 }

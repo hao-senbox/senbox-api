@@ -12,7 +12,7 @@ type GetUserEntityUseCase struct {
 }
 
 func (receiver *GetUserEntityUseCase) GetUserById(req request.GetUserEntityByIdRequest) (*entity.SUserEntity, error) {
-	return receiver.UserEntityRepository.GetByID(req)
+	return receiver.GetByID(req)
 }
 
 func (receiver *GetUserEntityUseCase) GetChildrenOfGuardian(userId string) (*[]response.UserEntityResponseData, error) {
@@ -20,9 +20,9 @@ func (receiver *GetUserEntityUseCase) GetChildrenOfGuardian(userId string) (*[]r
 }
 
 func (receiver *GetUserEntityUseCase) GetUserByUsername(req request.GetUserEntityByUsernameRequest) (*entity.SUserEntity, error) {
-	return receiver.UserEntityRepository.GetByUsername(req)
+	return receiver.GetByUsername(req)
 }
 
 func (receiver *GetUserEntityUseCase) GetAllUsers() ([]entity.SUserEntity, error) {
-	return receiver.UserEntityRepository.GetAll()
+	return receiver.GetAll()
 }

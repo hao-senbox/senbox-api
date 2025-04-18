@@ -23,5 +23,4 @@ type SaveFormParams struct {
 	Password       string
 	RawQuestions   []RawQuestion
 	SheetName      string
-	SyncStrategy   value.FormSyncStrategy
 }

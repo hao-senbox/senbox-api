@@ -27,11 +27,9 @@ func (receiver *UserEntityRepository) GetAll() ([]entity.SUserEntity, error) {
 	query := receiver.DBConn.Table("s_user_entity")
 	err := query.
 		Preload("Roles").
-		Preload("RolePolicies").
 		Preload("Guardians").
 		Preload("Devices").
-		Preload("Company").
-		Preload("UserConfig").
+		Preload("Organizations").
 		Find(&users).Error
 
 	if err != nil {
@@ -46,11 +44,9 @@ func (receiver *UserEntityRepository) GetByID(req request.GetUserEntityByIdReque
 	var user entity.SUserEntity
 	err := receiver.DBConn.
 		Preload("Roles").
-		Preload("RolePolicies").
 		Preload("Guardians").
 		Preload("Devices").
-		Preload("Company").
-		Preload("UserConfig").
+		Preload("Organizations").
 		Where("id = ?", req.ID).
 		First(&user).Error
 	if err != nil {
@@ -64,17 +60,19 @@ func (receiver *UserEntityRepository) GetByUsername(req request.GetUserEntityByU
 	var user entity.SUserEntity
 	err := receiver.DBConn.
 		Preload("Roles").
-		Preload("RolePolicies").
 		Preload("Guardians").
 		Preload("Devices").
-		Preload("Company").
-		Preload("UserConfig").
+		Preload("Organizations").
 		Where("username = ?", req.Username).
 		First(&user).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
 		log.Error("UserEntityRepository.GetByUsername: " + err.Error())
 		return nil, errors.New("failed to get user")
 	}
+
 	return &user, nil
 }
 
@@ -122,97 +120,103 @@ func (receiver *UserEntityRepository) GetChildrenOfGuardian(userId string) (*[]r
 }
 
 func (receiver *UserEntityRepository) CreateUser(req request.CreateUserEntityRequest) error {
-	receiver.DBConn.Transaction(func(tx *gorm.DB) error {
-		user, _ := receiver.GetByUsername(request.GetUserEntityByUsernameRequest{Username: req.Username})
+	tx := receiver.DBConn.Begin()
+	_, err := receiver.GetByUsername(request.GetUserEntityByUsernameRequest{Username: req.Username})
 
-		if user != nil {
-			return errors.New("user already existed")
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			tx.Rollback()
+			return err
 		}
+	}
 
-		birthday, err := time.Parse("2006-01-02", req.Birthday)
-		if err != nil {
-			log.Error("UserRepository.CreateUser: " + err.Error())
-			return errors.New("failed to create user " + req.Username)
-		}
+	birthday, err := time.Parse("2006-01-02", req.Birthday)
+	if err != nil {
+		log.Error("UserRepository.CreateUser: " + err.Error())
+		tx.Rollback()
+		return errors.New("failed to create user " + req.Username)
+	}
 
-		var setting entity.SSetting
-		err = receiver.DBConn.Table("s_setting").Where("type = ?", value.SettingTypeSignUpPresetValue1).First(&setting).Error
+	var setting entity.SSetting
+	err = tx.Table("s_setting").Where("type = ?", value.SettingTypeSignUpPresetValue1).First(&setting).Error
 
-		if err != nil {
-			log.Error("UserRepository.CreateUser: " + err.Error())
-			return errors.New("failed to create user " + req.Username)
-		}
+	if err != nil {
+		log.Error("UserRepository.CreateUser: " + err.Error())
+		tx.Rollback()
+		return errors.New("failed to create user " + req.Username)
+	}
 
-		var signupSetting SignUpFormSetting
-		err = json.Unmarshal([]byte(setting.Settings), &signupSetting)
+	var signupSetting SignUpFormSetting
+	err = json.Unmarshal([]byte(setting.Settings), &signupSetting)
 
-		if err != nil {
-			log.Error("UserRepository.CreateUser: " + err.Error())
-			return errors.New("failed to create user " + req.Username)
-		}
+	if err != nil {
+		log.Error("UserRepository.CreateUser: " + err.Error())
+		tx.Rollback()
+		return errors.New("failed to create user " + req.Username)
+	}
 
-		var userReq = entity.SUserEntity{
-			Username:  req.Username,
-			Fullname:  signupSetting.SpreadSheetId,
-			Birthday:  birthday,
-			CompanyId: 1,
-			Password:  req.Password,
-		}
-		userResult := receiver.DBConn.Create(&userReq)
+	var userReq = entity.SUserEntity{
+		Username: req.Username,
+		Fullname: signupSetting.SpreadSheetId,
+		Birthday: birthday,
+		Password: req.Password,
+	}
+	userResult := tx.Create(&userReq)
 
-		if userResult.Error != nil {
-			log.Error("UserRepository.CreateUser: " + userResult.Error.Error())
-			return errors.New("failed to create user " + req.Username)
-		}
+	if userResult.Error != nil {
+		log.Error("UserRepository.CreateUser: " + userResult.Error.Error())
+		tx.Rollback()
+		return errors.New("failed to create user " + req.Username)
+	}
 
-		if req.Guardians != nil {
-			for _, guardian := range *req.Guardians {
-				userGuardianResult := receiver.DBConn.Create(&entity.SUserGuardians{
-					UserId:     userReq.ID,
-					GuardianId: uuid.MustParse(guardian),
-				})
-				if userGuardianResult.Error != nil {
-					log.Error("UserRepository.CreateUser: " + userGuardianResult.Error.Error())
-					return errors.New("failed to create user guardian")
-				}
+	if req.Guardians != nil && len(*req.Guardians) > 0 {
+		for _, guardian := range *req.Guardians {
+			userGuardianResult := tx.Create(&entity.SUserGuardians{
+				UserId:     userReq.ID,
+				GuardianId: uuid.MustParse(guardian),
+			})
+			if userGuardianResult.Error != nil {
+				log.Error("UserRepository.CreateUser: " + userGuardianResult.Error.Error())
+				tx.Rollback()
+				return errors.New("failed to create user guardian")
 			}
 		}
+	}
 
-		if req.Roles != nil {
-			roles := make([]uint, 0)
-			for _, roleName := range *req.Roles {
-				var role entity.SRole
-				err := receiver.DBConn.Model(&entity.SRole{}).Where("role_name = ?", roleName).Find(&role).Error
-				if err != nil {
-					log.Error("UserRepository.CreateUser: " + err.Error())
-					if errors.Is(err, gorm.ErrRecordNotFound) {
-						return errors.New("role does not exist")
-					}
-
-					return errors.New("failed to get role")
-				}
-
-				if role.ID == 0 {
+	if req.Roles != nil && len(*req.Roles) > 0 {
+		roles := make([]uint, 0)
+		for _, roleName := range *req.Roles {
+			var role entity.SRole
+			err := tx.Model(&entity.SRole{}).Where("role_name = ?", roleName).Find(&role).Error
+			if err != nil {
+				log.Error("UserRepository.CreateUser: " + err.Error())
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					tx.Rollback()
 					return errors.New("role does not exist")
 				}
 
-				roles = append(roles, uint(role.ID))
+				tx.Rollback()
+				return errors.New("failed to get role")
 			}
-			err := receiver.UpdateUserRole(request.UpdateUserRoleRequest{UserId: userReq.ID.String(), Roles: roles})
-			if err != nil {
-				return err
-			}
-		}
 
-		if req.Policies != nil {
-			err := receiver.UpdateUserRolePolicy(request.UpdateUserRolePolicyRequest{UserId: userReq.ID.String(), Policies: *req.Policies})
-			if err != nil {
-				return err
+			if role.ID == 0 {
+				tx.Rollback()
+				return errors.New("role does not exist")
 			}
-		}
 
-		return nil
-	})
+			roles = append(roles, uint(role.ID))
+		}
+		tx.Commit()
+		err := receiver.UpdateUserRole(request.UpdateUserRoleRequest{UserId: userReq.ID.String(), Roles: roles})
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		log.Warnf("Attempted to commit a transaction that is already committed: %v", err)
+	}
 
 	return nil
 }
@@ -249,13 +253,6 @@ func (receiver *UserEntityRepository) UpdateUser(req request.UpdateUserEntityReq
 			roles = append(roles, uint(role.ID))
 		}
 		err := receiver.UpdateUserRole(request.UpdateUserRoleRequest{UserId: req.ID, Roles: roles})
-		if err != nil {
-			return err
-		}
-	}
-
-	if req.Policies != nil {
-		err := receiver.UpdateUserRolePolicy(request.UpdateUserRolePolicyRequest{UserId: req.ID, Policies: *req.Policies})
 		if err != nil {
 			return err
 		}
@@ -411,43 +408,45 @@ func (receiver *UserEntityRepository) UpdateUserRole(req request.UpdateUserRoleR
 	return nil
 }
 
-func (receiver *UserEntityRepository) UpdateUserRolePolicy(req request.UpdateUserRolePolicyRequest) error {
+func (receiver *UserEntityRepository) UpdateUserRoleClaimPermission(req request.UpdateUserRoleClaimPermissionRequest) error {
 	user, err := receiver.GetByID(request.GetUserEntityByIdRequest{ID: req.UserId})
 
 	if err != nil {
-		log.Error("UserEntityRepository.UpdateUserRolePolicy: " + err.Error())
+		log.Error("UserEntityRepository.UpdateUserRoleClaimPermission: " + err.Error())
 		return errors.New("failed to get user")
 	}
 
-	removeResult := receiver.DBConn.Exec("DELETE FROM s_user_policies WHERE user_id = ?", user.ID)
+	tx := receiver.DBConn.Begin()
+
+	removeResult := tx.Exec("DELETE FROM s_user_roles WHERE user_id = ? AND role", user.ID)
 
 	if removeResult.Error != nil {
-		log.Error("UserEntityRepository.UpdateUserRolePolicy: " + removeResult.Error.Error())
+		log.Error("UserEntityRepository.UpdateUserRoleClaimPermission: " + removeResult.Error.Error())
 		return errors.New("failed to remove user policy")
 	}
 
-	for _, policyId := range req.Policies {
-		var policy entity.SRolePolicy
-		err = receiver.DBConn.Where("id = ?", policyId).First(&policy).Error
+	// for _, policyId := range req.Policies {
+	// 	var policy entity.SRolePolicy
+	// 	err = receiver.DBConn.Where("id = ?", policyId).First(&policy).Error
 
-		if err != nil {
-			log.Error("UserEntityRepository.UpdateUserRolePolicy: " + err.Error())
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return errors.New("policy doesn't exist")
-			}
-			return errors.New("failed to get policy")
-		}
+	// 	if err != nil {
+	// 		log.Error("UserEntityRepository.UpdateUserRoleClaimPermission: " + err.Error())
+	// 		if errors.Is(err, gorm.ErrRecordNotFound) {
+	// 			return errors.New("policy doesn't exist")
+	// 		}
+	// 		return errors.New("failed to get policy")
+	// 	}
 
-		result := receiver.DBConn.Create(&entity.SUserPolicies{
-			UserId:   user.ID,
-			PolicyId: policy.ID,
-		})
+	// 	result := receiver.DBConn.Create(&entity.SUserPolicies{
+	// 		UserId:   user.ID,
+	// 		PolicyId: policy.ID,
+	// 	})
 
-		if result.Error != nil {
-			log.Error("UserEntityRepository.UpdateUserRolePolicy: " + result.Error.Error())
-			return errors.New("failed to assign user policy")
-		}
-	}
+	// 	if result.Error != nil {
+	// 		log.Error("UserEntityRepository.UpdateUserRoleClaimPermission: " + result.Error.Error())
+	// 		return errors.New("failed to assign user policy")
+	// 	}
+	// }
 
 	return nil
 }

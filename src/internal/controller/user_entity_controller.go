@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"github.com/samber/lo"
 	"net/http"
+	"sen-global-api/internal/domain/entity"
 	"sen-global-api/internal/domain/request"
 	"sen-global-api/internal/domain/response"
 	"sen-global-api/internal/domain/usecase"
@@ -15,6 +17,7 @@ type UserEntityController struct {
 	*usecase.GetUserEntityUseCase
 	*usecase.CreateUserEntityUseCase
 	*usecase.UpdateUserEntityUseCase
+	*usecase.UpdateUserRoleUseCase
 	*usecase.AuthorizeUseCase
 }
 
@@ -23,22 +26,18 @@ func (receiver *UserEntityController) GetAllUserEntity(context *gin.Context) {
 	if role == "" {
 		context.JSON(
 			http.StatusBadRequest, response.FailedResponse{
-				Error: response.Cause{
-					Code:    http.StatusBadRequest,
-					Message: "role is required",
-				},
+				Code:  http.StatusBadRequest,
+				Error: "role is required",
 			},
 		)
 		return
 	}
 
-	users, err := receiver.GetUserEntityUseCase.GetAllUsers()
+	users, err := receiver.GetAllUsers()
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, response.FailedResponse{
-			Error: response.Cause{
-				Code:    http.StatusInternalServerError,
-				Message: err.Error(),
-			},
+			Code:  http.StatusInternalServerError,
+			Error: err.Error(),
 		})
 
 		return
@@ -48,7 +47,7 @@ func (receiver *UserEntityController) GetAllUserEntity(context *gin.Context) {
 	for _, user := range users {
 		var roles []string
 		for _, r := range user.Roles {
-			if role != "" && strings.ToLower(role) != "all" {
+			if strings.ToLower(role) != "all" {
 				if !strings.EqualFold(r.RoleName, role) {
 					continue
 				}
@@ -78,10 +77,8 @@ func (receiver *UserEntityController) GetChildrenOfGuardian(context *gin.Context
 	if userId == "" {
 		context.JSON(
 			http.StatusBadRequest, response.FailedResponse{
-				Error: response.Cause{
-					Code:    http.StatusBadRequest,
-					Message: "user id is required",
-				},
+				Code:  http.StatusBadRequest,
+				Error: "user id is required",
 			},
 		)
 		return
@@ -90,10 +87,8 @@ func (receiver *UserEntityController) GetChildrenOfGuardian(context *gin.Context
 	users, err := receiver.GetUserEntityUseCase.GetChildrenOfGuardian(userId)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, response.FailedResponse{
-			Error: response.Cause{
-				Code:    http.StatusInternalServerError,
-				Message: err.Error(),
-			},
+			Code:  http.StatusInternalServerError,
+			Error: err.Error(),
 		})
 
 		return
@@ -109,10 +104,8 @@ func (receiver *UserEntityController) GetUserEntityById(context *gin.Context) {
 	if userId == "" {
 		context.JSON(
 			http.StatusBadRequest, response.FailedResponse{
-				Error: response.Cause{
-					Code:    http.StatusBadRequest,
-					Message: "user id is required",
-				},
+				Code:  http.StatusBadRequest,
+				Error: "user id is required",
 			},
 		)
 		return
@@ -121,10 +114,8 @@ func (receiver *UserEntityController) GetUserEntityById(context *gin.Context) {
 	userEntity, err := receiver.GetUserById(request.GetUserEntityByIdRequest{ID: userId})
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, response.FailedResponse{
-			Error: response.Cause{
-				Code:    http.StatusInternalServerError,
-				Message: err.Error(),
-			},
+			Code:  http.StatusInternalServerError,
+			Error: err.Error(),
 		})
 
 		return
@@ -137,17 +128,6 @@ func (receiver *UserEntityController) GetUserEntityById(context *gin.Context) {
 			roleListResponse = append(roleListResponse, response.RoleListResponseData{
 				ID:       role.ID,
 				RoleName: role.RoleName,
-			})
-		}
-	}
-
-	var rolePoliciesListResponse []response.RolePolicyListResponseData
-	if len(userEntity.RolePolicies) > 0 {
-		rolePoliciesListResponse = make([]response.RolePolicyListResponseData, 0)
-		for _, rolePolicy := range userEntity.RolePolicies {
-			rolePoliciesListResponse = append(rolePoliciesListResponse, response.RolePolicyListResponseData{
-				ID:         rolePolicy.ID,
-				PolicyName: rolePolicy.PolicyName,
 			})
 		}
 	}
@@ -171,14 +151,13 @@ func (receiver *UserEntityController) GetUserEntityById(context *gin.Context) {
 		}
 	}
 
-	var userConfig *response.UserConfigResponse
-	if userEntity.UserConfig != nil {
-		userConfig = &response.UserConfigResponse{
-			TopButtonConfig:      userEntity.UserConfig.TopButtonConfig,
-			StudentOutputSheetId: userEntity.UserConfig.StudentOutputSheetId,
-			TeacherOutputSheetId: userEntity.UserConfig.TeacherOutputSheetId,
-		}
+	var organizations []string
+	if len(userEntity.Organizations) > 0 {
+		organizations = lo.Map(userEntity.Organizations, func(item entity.SOrganization, index int) string {
+			return item.OrganizationName
+		})
 	}
+	
 	context.JSON(http.StatusOK, response.SucceedResponse{
 		Data: response.UserEntityResponse{
 			ID:           userEntity.ID.String(),
@@ -187,11 +166,9 @@ func (receiver *UserEntityController) GetUserEntityById(context *gin.Context) {
 			Phone:        userEntity.Phone,
 			Email:        userEntity.Email,
 			Dob:          userEntity.Birthday.Format("2006-01-02"),
-			Company:      userEntity.Company.CompanyName,
+			Organization: organizations,
 			CreatedAt:    userEntity.CreatedAt.Format("2006-01-02"),
-			UserConfig:   userConfig,
 			Roles:        &roleListResponse,
-			RolePolicies: &rolePoliciesListResponse,
 			Guardians:    &guardianListResponse,
 			Devices:      &deviceListResponse,
 		},
@@ -203,10 +180,8 @@ func (receiver *UserEntityController) GetUserEntityByName(context *gin.Context) 
 	if username == "" {
 		context.JSON(
 			http.StatusBadRequest, response.FailedResponse{
-				Error: response.Cause{
-					Code:    http.StatusBadRequest,
-					Message: "user name is required",
-				},
+				Code:  http.StatusBadRequest,
+				Error: "user name is required",
 			},
 		)
 		return
@@ -215,10 +190,8 @@ func (receiver *UserEntityController) GetUserEntityByName(context *gin.Context) 
 	userEntity, err := receiver.GetUserByUsername(request.GetUserEntityByUsernameRequest{Username: username})
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, response.FailedResponse{
-			Error: response.Cause{
-				Code:    http.StatusInternalServerError,
-				Message: err.Error(),
-			},
+			Code:  http.StatusInternalServerError,
+			Error: err.Error(),
 		})
 
 		return
@@ -231,17 +204,6 @@ func (receiver *UserEntityController) GetUserEntityByName(context *gin.Context) 
 			roleListResponse = append(roleListResponse, response.RoleListResponseData{
 				ID:       role.ID,
 				RoleName: role.RoleName,
-			})
-		}
-	}
-
-	var rolePoliciesListResponse []response.RolePolicyListResponseData
-	if len(userEntity.RolePolicies) > 0 {
-		rolePoliciesListResponse = make([]response.RolePolicyListResponseData, 0)
-		for _, rolePolicy := range userEntity.RolePolicies {
-			rolePoliciesListResponse = append(rolePoliciesListResponse, response.RolePolicyListResponseData{
-				ID:         rolePolicy.ID,
-				PolicyName: rolePolicy.PolicyName,
 			})
 		}
 	}
@@ -265,13 +227,11 @@ func (receiver *UserEntityController) GetUserEntityByName(context *gin.Context) 
 		}
 	}
 
-	var userConfig *response.UserConfigResponse
-	if userEntity.UserConfig != nil {
-		userConfig = &response.UserConfigResponse{
-			TopButtonConfig:      userEntity.UserConfig.TopButtonConfig,
-			StudentOutputSheetId: userEntity.UserConfig.StudentOutputSheetId,
-			TeacherOutputSheetId: userEntity.UserConfig.TeacherOutputSheetId,
-		}
+	var organizations []string
+	if len(userEntity.Organizations) > 0 {
+		organizations = lo.Map(userEntity.Organizations, func(item entity.SOrganization, index int) string {
+			return item.OrganizationName
+		})
 	}
 
 	context.JSON(http.StatusOK, response.SucceedResponse{
@@ -281,10 +241,8 @@ func (receiver *UserEntityController) GetUserEntityByName(context *gin.Context) 
 			Fullname:     userEntity.Fullname,
 			Phone:        userEntity.Phone,
 			Email:        userEntity.Email,
-			Company:      userEntity.Company.CompanyName,
-			UserConfig:   userConfig,
+			Organization: organizations,
 			Roles:        &roleListResponse,
-			RolePolicies: &rolePoliciesListResponse,
 			Guardians:    &guardianListResponse,
 			Devices:      &deviceListResponse,
 		},
@@ -295,10 +253,8 @@ func (receiver *UserEntityController) CreateUserEntity(context *gin.Context) {
 	var req request.CreateUserEntityRequest
 	if err := context.ShouldBindJSON(&req); err != nil {
 		context.JSON(http.StatusBadRequest, response.FailedResponse{
-			Error: response.Cause{
-				Code:    http.StatusBadRequest,
-				Message: err.Error(),
-			},
+			Code:  http.StatusBadRequest,
+			Error: err.Error(),
 		})
 		return
 	}
@@ -306,10 +262,8 @@ func (receiver *UserEntityController) CreateUserEntity(context *gin.Context) {
 	// Validate username
 	if err := req.IsUsernameValid(); err != nil {
 		context.JSON(http.StatusBadRequest, response.FailedResponse{
-			Error: response.Cause{
-				Code:    http.StatusBadRequest,
-				Message: err.Error(),
-			},
+			Code:  http.StatusBadRequest,
+			Error: err.Error(),
 		})
 		return
 	}
@@ -317,10 +271,8 @@ func (receiver *UserEntityController) CreateUserEntity(context *gin.Context) {
 	// Validate the user's age
 	if err := req.IsOver18(); err != nil {
 		context.JSON(http.StatusBadRequest, response.FailedResponse{
-			Error: response.Cause{
-				Code:    http.StatusBadRequest,
-				Message: err.Error(),
-			},
+			Code:  http.StatusBadRequest,
+			Error: err.Error(),
 		})
 		return
 	}
@@ -328,15 +280,13 @@ func (receiver *UserEntityController) CreateUserEntity(context *gin.Context) {
 	err := receiver.CreateUserEntityUseCase.CreateUserEntity(req)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, response.FailedResponse{
-			Error: response.Cause{
-				Code:    http.StatusBadRequest,
-				Message: err.Error(),
-			},
+			Code:  http.StatusBadRequest,
+			Error: err.Error(),
 		})
 		return
 	}
 
-	data, err := receiver.AuthorizeUseCase.UserLoginUsecase(request.UserLoginFromDeviceReqest{
+	data, err := receiver.UserLoginUsecase(request.UserLoginFromDeviceReqest{
 		Username:   req.Username,
 		Password:   req.Password,
 		DeviceUUID: req.DeviceUUID,
@@ -345,10 +295,8 @@ func (receiver *UserEntityController) CreateUserEntity(context *gin.Context) {
 	if err != nil {
 		context.JSON(
 			http.StatusBadRequest, response.FailedResponse{
-				Error: response.Cause{
-					Code:    http.StatusBadRequest,
-					Message: err.Error(),
-				},
+				Code:  http.StatusBadRequest,
+				Error: err.Error(),
 			},
 		)
 		return
@@ -364,10 +312,8 @@ func (receiver *UserEntityController) UpdateUserEntity(context *gin.Context) {
 	if err := context.ShouldBindJSON(&req); err != nil {
 		log.Error(err)
 		context.JSON(http.StatusBadRequest, response.FailedResponse{
-			Error: response.Cause{
-				Code:    http.StatusBadRequest,
-				Message: err.Error(),
-			},
+			Code:  http.StatusBadRequest,
+			Error: err.Error(),
 		})
 		return
 	}
@@ -386,10 +332,8 @@ func (receiver *UserEntityController) UpdateUserEntity(context *gin.Context) {
 	// Validate the user's phone number
 	if ok := req.ValidatePhone(); !ok {
 		context.JSON(http.StatusBadRequest, response.FailedResponse{
-			Error: response.Cause{
-				Code:    http.StatusBadRequest,
-				Message: "invalid phone number",
-			},
+			Code:  http.StatusBadRequest,
+			Error: "invalid phone number",
 		})
 		return
 	}
@@ -399,18 +343,39 @@ func (receiver *UserEntityController) UpdateUserEntity(context *gin.Context) {
 		log.Error(err)
 
 		context.JSON(http.StatusBadRequest, response.FailedResponse{
-			Error: response.Cause{
-				Code:    http.StatusBadRequest,
-				Message: err.Error(),
-			},
+			Code:  http.StatusBadRequest,
+			Error: err.Error(),
 		})
 		return
 	}
 
 	context.JSON(http.StatusOK, response.SucceedResponse{
-		Data: response.Cause{
-			Code:    http.StatusOK,
-			Message: "user was update successfully",
-		},
+		Code:    http.StatusOK,
+		Message: "user was update successfully",
+	})
+}
+
+func (receiver *UserEntityController) UpdateUserRole(context *gin.Context) {
+	var req request.UpdateUserRoleRequest
+	if err := context.ShouldBindJSON(&req); err != nil {
+		context.JSON(http.StatusBadRequest, response.FailedResponse{
+			Code:  http.StatusBadRequest,
+			Error: err.Error(),
+		})
+		return
+	}
+
+	err := receiver.UpdateUserRoleUseCase.UpdateUserRole(req)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, response.FailedResponse{
+			Code:  http.StatusBadRequest,
+			Error: err.Error(),
+		})
+		return
+	}
+
+	context.JSON(http.StatusOK, response.SucceedResponse{
+		Code:    http.StatusOK,
+		Message: "user role was updated successfully",
 	})
 }

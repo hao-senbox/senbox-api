@@ -5,10 +5,10 @@ import (
 	"sen-global-api/internal/domain/request"
 )
 
-type UpdateUserEntityUseCase struct {
+type UpdateUserRoleUseCase struct {
 	*repository.UserEntityRepository
 }
 
-func (receiver *UpdateUserEntityUseCase) UpdateUserEntity(req request.UpdateUserEntityRequest) error {
-	return receiver.UpdateUser(req)
+func (receiver *UpdateUserRoleUseCase) UpdateUserRole(req request.UpdateUserRoleRequest) error {
+	return receiver.UserEntityRepository.UpdateUserRole(req)
 }

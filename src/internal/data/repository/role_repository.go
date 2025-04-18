@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sen-global-api/internal/domain/entity"
 	"sen-global-api/internal/domain/request"
+	"strconv"
 
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -17,12 +18,12 @@ func NewRoleRepository(dbConn *gorm.DB) *RoleRepository {
 	return &RoleRepository{DBConn: dbConn}
 }
 
-func (receiver *RoleRepository) GetAll() ([]entity.SRole, error) {
+func (receiver *RoleRepository) GetAllByOrganization(organizationId int64) ([]entity.SRole, error) {
 	var roles []entity.SRole
-	err := receiver.DBConn.Table("s_role").Find(&roles).Error
+	err := receiver.DBConn.Table("s_role").Where("organization_id = ?", organizationId).Find(&roles).Error
 	if err != nil {
 		log.Error("RoleRepository.GetAll: " + err.Error())
-		return nil, errors.New("failed to get all roles")
+		return nil, errors.New("failed to get all roles by organization id " + strconv.FormatInt(organizationId, 10))
 	}
 
 	return roles, err
@@ -55,9 +56,21 @@ func (receiver *RoleRepository) CreateRole(req request.CreateRoleRequest) error 
 		return errors.New("role already existed")
 	}
 
+	var organization entity.SOrganization
+	err := receiver.DBConn.Model(&entity.SOrganization{}).Where("id = ?", req.OrganizationId).First(&organization).Error
+
+	if err != nil {
+		log.Error("RoleRepository.CreateRole: " + err.Error())
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("organization doesn't exist")
+		}
+		return errors.New("failed to get organization")
+	}
+
 	result := receiver.DBConn.Create(&entity.SRole{
-		RoleName:    req.RoleName,
-		Description: req.Description,
+		RoleName:       req.RoleName,
+		Description:    req.Description,
+		OrganizationId: organization.ID,
 	})
 
 	if result.Error != nil {

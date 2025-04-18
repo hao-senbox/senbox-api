@@ -15,7 +15,6 @@ type CreateUserEntityRequest struct {
 	Password   string    `json:"password" binding:"required"`
 	Guardians  *[]string `json:"guardians"`
 	Roles      *[]string `json:"roles"`
-	Policies   *[]uint   `json:"policies"`
 	DeviceUUID string    `json:"device_uuid" binding:"required"`
 }
 

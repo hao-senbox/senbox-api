@@ -75,6 +75,7 @@ const (
 	QuestionSignUpPresetRole
 	QuestionSignUpPresetConditionAccept
 	QuestionSignUpPresetRoleSelectWorkingAddress
+
 	SignUpButtonConfiguration1
 	SignUpButtonConfiguration2
 	SignUpButtonConfiguration3
@@ -85,6 +86,7 @@ const (
 	SignUpButtonConfiguration8
 	SignUpButtonConfiguration9
 	SignUpButtonConfiguration10
+
 	UserInformationValue1
 	UserInformationValue2
 	UserInformationValue3
@@ -92,6 +94,8 @@ const (
 	UserInformationValue5
 	UserInformationValue6
 	UserInformationValue7
+
+	CameraSquareLens
 )
 
 type DeviceStatus int
@@ -337,6 +341,9 @@ func GetRawValue(questionType QuestionType) string {
 		return "choice_toggle_user"
 	case QuestionSendNotification:
 		return "send_notification"
+
+	case CameraSquareLens:
+		return "camera_square_lens"
 	}
 
 	return ""
@@ -464,6 +471,9 @@ func GetStringValue(questionType QuestionType) string {
 		return "document"
 	case QuestionQRCodeGenerator:
 		return "qrcode_generator"
+
+	case CameraSquareLens:
+		return "camera_square_lens"
 
 	default:
 		return ""
@@ -638,6 +648,9 @@ func GetQuestionType(rawValue string) (QuestionType, error) {
 	case "qrcode_generator":
 		return QuestionQRCodeGenerator, nil
 
+	case "camera_square_lens":
+		return CameraSquareLens, nil
+
 	default:
 		return 0, errors.New("invalid raw value")
 	}
@@ -703,7 +716,9 @@ func IsGeneralQuestionType(questionType QuestionType) bool {
 		UserInformationValue4,
 		UserInformationValue5,
 		UserInformationValue6,
-		UserInformationValue7:
+		UserInformationValue7,
+
+		CameraSquareLens:
 		return true
 	default:
 		return false
@@ -742,33 +757,6 @@ func GetUserInfoInputTypeFromString(userInfoInputType string) (UserInfoInputType
 	default:
 		return UserInfoInputTypeBarcode, nil
 	}
-}
-
-type Role uint
-
-const (
-	Guest      Role = iota + 1
-	User       Role = Guest << 1
-	Moderator  Role = Guest << 2
-	Admin      Role = Guest << 3
-	SuperAdmin Role = Guest << 4
-)
-
-func GetRawValueOfRole(role Role) uint {
-	switch role {
-	case Guest:
-		return 1
-	case User:
-		return 2
-	case Moderator:
-		return 4
-	case Admin:
-		return 8
-	case SuperAdmin:
-		return 16
-	}
-
-	return 0
 }
 
 func GetRawStatusValue(status Status) string {
@@ -901,13 +889,6 @@ func GetRawButtonTypeValue(buttonType ButtonType) string {
 	}
 }
 
-type FormSyncStrategy string
-
-const (
-	FormSyncStrategyOnSubmit FormSyncStrategy = "on_submit"
-	FormSyncStrategyOnSync   FormSyncStrategy = "on_sync"
-)
-
 const (
 	WorkingHoursStart = "08:00"
 	WorkingHoursEnd   = "20:00"
@@ -951,17 +932,6 @@ const (
 	NotificationType_NoteChanged                NotificationType = "note_changed"
 	NotificationType_DeviceStatusChanged        NotificationType = "device_status_changed"
 )
-
-func GetFormSyncStrategyFromString(rawValue string) FormSyncStrategy {
-	switch strings.ToLower(rawValue) {
-	case "realtime":
-		return FormSyncStrategyOnSubmit
-	case "lazysync":
-		return FormSyncStrategyOnSync
-	default:
-		return FormSyncStrategyOnSync
-	}
-}
 
 type FcmTopics string
 

@@ -5,7 +5,6 @@ import (
 	"sen-global-api/internal/domain/request"
 	"sen-global-api/internal/domain/response"
 	"sen-global-api/internal/domain/usecase"
-
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -20,24 +19,20 @@ func (receiver LoginController) Login(c *gin.Context) {
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(
 			http.StatusBadRequest, response.FailedResponse{
-				Error: response.Cause{
-					Code:    http.StatusBadRequest,
-					Message: err.Error(),
-				},
+				Code:  http.StatusBadRequest,
+				Error: err.Error(),
 			},
 		)
 		return
 	}
 
-	data, err := receiver.AuthorizeUseCase.LoginInputDao(req)
+	data, err := receiver.LoginInputDao(req)
 
 	if err != nil {
 		c.JSON(
 			http.StatusBadRequest, response.FailedResponse{
-				Error: response.Cause{
-					Code:    http.StatusBadRequest,
-					Message: err.Error(),
-				},
+				Code:  http.StatusBadRequest,
+				Error: err.Error(),
 			},
 		)
 		return
@@ -65,24 +60,20 @@ func (receiver LoginController) UserLogin(c *gin.Context) {
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(
 			http.StatusBadRequest, response.FailedResponse{
-				Error: response.Cause{
-					Code:    http.StatusBadRequest,
-					Message: err.Error(),
-				},
+				Code:  http.StatusBadRequest,
+				Error: err.Error(),
 			},
 		)
 		return
 	}
 
-	data, err := receiver.AuthorizeUseCase.UserLoginUsecase(req)
+	data, err := receiver.UserLoginUsecase(req)
 
 	if err != nil {
 		c.JSON(
 			http.StatusBadRequest, response.FailedResponse{
-				Error: response.Cause{
-					Code:    http.StatusBadRequest,
-					Message: err.Error(),
-				},
+				Code:  http.StatusBadRequest,
+				Error: err.Error(),
 			},
 		)
 		return

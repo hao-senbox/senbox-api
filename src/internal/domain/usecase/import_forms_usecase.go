@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -76,7 +77,7 @@ func (receiver *ImportFormsUseCase) SyncForms(req request.ImportFormRequest) err
 		}
 		values, err := receiver.SpreadsheetReader.Get(sheet.ReadSpecificRangeParams{
 			SpreadsheetId: spreadsheetId,
-			ReadRange:     sheetName + `!` + receiver.AppConfig.Google.FirstColumn + strconv.Itoa(receiver.Google.FirstRow+2) + `:AC`,
+			ReadRange:     sheetName + `!` + receiver.Google.FirstColumn + strconv.Itoa(receiver.Google.FirstRow+2) + `:AC`,
 		})
 		if err != nil {
 			log.Error(err)
@@ -95,7 +96,7 @@ func (receiver *ImportFormsUseCase) SyncForms(req request.ImportFormRequest) err
 						log.Error(err)
 					} else {
 						_, err = receiver.SpreadsheetWriter.UpdateRange(sheet.WriteRangeParams{
-							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.AppConfig.Google.FirstRow+2) + ":Q",
+							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.Google.FirstRow+2) + ":Q",
 							Dimension: "ROWS",
 							Rows:      [][]interface{}{{"DELETED", time.Now().Format("2006-01-02 15:04:05"), ""}},
 						}, spreadsheetId)
@@ -110,7 +111,7 @@ func (receiver *ImportFormsUseCase) SyncForms(req request.ImportFormRequest) err
 						log.Error(err)
 					} else {
 						_, err = receiver.SpreadsheetWriter.UpdateRange(sheet.WriteRangeParams{
-							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.AppConfig.Google.FirstRow+2) + ":Q",
+							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.Google.FirstRow+2) + ":Q",
 							Dimension: "ROWS",
 							Rows:      [][]interface{}{{"DEACTIVATED", time.Now().Format("2006-01-02 15:04:05"), ""}},
 						}, spreadsheetId)
@@ -139,20 +140,16 @@ func (receiver *ImportFormsUseCase) SyncForms(req request.ImportFormRequest) err
 							}
 						}
 					}
-					var tabName string = ""
+					tabName := ""
 					if len(row) >= 17 {
 						tabName = row[16].(string)
 					}
-					syncStrategy := value.FormSyncStrategyOnSubmit
-					if len(row) >= 19 {
-						syncStrategy = value.GetFormSyncStrategyFromString(row[18].(string))
-					}
-					reason, importErr := receiver.importForm(row[0].(string), row[1].(string), row[2].(string), tabName, syncStrategy)
+					reason, importErr := receiver.importForm(row[0].(string), row[1].(string), row[2].(string), tabName)
 					if importErr != nil {
 						log.Error(importErr)
 						monitor.LogGoogleAPIRequestImportForm()
 						_, err = receiver.SpreadsheetWriter.UpdateRange(sheet.WriteRangeParams{
-							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.AppConfig.Google.FirstRow+2) + ":Q",
+							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.Google.FirstRow+2) + ":Q",
 							Dimension: "ROWS",
 							Rows:      [][]interface{}{{"UPLOADED", time.Now().Format("2006-01-02 15:04:05"), reason}},
 						}, spreadsheetId)
@@ -163,7 +160,7 @@ func (receiver *ImportFormsUseCase) SyncForms(req request.ImportFormRequest) err
 					} else {
 						monitor.LogGoogleAPIRequestImportForm()
 						_, err = receiver.SpreadsheetWriter.UpdateRange(sheet.WriteRangeParams{
-							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.AppConfig.Google.FirstRow+2) + ":Q",
+							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.Google.FirstRow+2) + ":Q",
 							Dimension: "ROWS",
 							Rows:      [][]interface{}{{"UPLOADED", time.Now().Format("2006-01-02 15:04:05"), reason}},
 						}, spreadsheetId)
@@ -241,7 +238,7 @@ func (receiver *ImportFormsUseCase) ImportForms(req request.ImportFormRequest, u
 		}
 		values, err := receiver.SpreadsheetReader.Get(sheet.ReadSpecificRangeParams{
 			SpreadsheetId: spreadsheetId,
-			ReadRange:     sheetName + `!` + receiver.AppConfig.Google.FirstColumn + strconv.Itoa(receiver.Google.FirstRow+2) + `:AC`,
+			ReadRange:     sheetName + `!` + receiver.Google.FirstColumn + strconv.Itoa(receiver.Google.FirstRow+2) + `:AC`,
 		})
 		if err != nil {
 			log.Error(err)
@@ -260,7 +257,7 @@ func (receiver *ImportFormsUseCase) ImportForms(req request.ImportFormRequest, u
 						log.Error(err)
 					} else {
 						_, err = receiver.SpreadsheetWriter.UpdateRange(sheet.WriteRangeParams{
-							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.AppConfig.Google.FirstRow+2) + ":Q",
+							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.Google.FirstRow+2) + ":Q",
 							Dimension: "ROWS",
 							Rows:      [][]interface{}{{"DELETED", time.Now().Format("2006-01-02 15:04:05"), ""}},
 						}, spreadsheetId)
@@ -275,7 +272,7 @@ func (receiver *ImportFormsUseCase) ImportForms(req request.ImportFormRequest, u
 						log.Error(err)
 					} else {
 						_, err = receiver.SpreadsheetWriter.UpdateRange(sheet.WriteRangeParams{
-							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.AppConfig.Google.FirstRow+2) + ":Q",
+							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.Google.FirstRow+2) + ":Q",
 							Dimension: "ROWS",
 							Rows:      [][]interface{}{{"DEACTIVATED", time.Now().Format("2006-01-02 15:04:05"), ""}},
 						}, spreadsheetId)
@@ -304,20 +301,16 @@ func (receiver *ImportFormsUseCase) ImportForms(req request.ImportFormRequest, u
 							// }
 						}
 					}
-					var tabName string = ""
+					tabName := ""
 					if len(row) >= 17 {
 						tabName = row[16].(string)
 					}
-					syncStrategy := value.FormSyncStrategyOnSubmit
-					if len(row) >= 19 {
-						syncStrategy = value.GetFormSyncStrategyFromString(row[18].(string))
-					}
-					reason, importErr := receiver.importForm(row[0].(string), row[1].(string), row[2].(string), tabName, syncStrategy)
+					reason, importErr := receiver.importForm(row[0].(string), row[1].(string), row[2].(string), tabName)
 					if importErr != nil {
 						log.Error(importErr)
 						monitor.LogGoogleAPIRequestImportForm()
 						_, err = receiver.SpreadsheetWriter.UpdateRange(sheet.WriteRangeParams{
-							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.AppConfig.Google.FirstRow+2) + ":Q",
+							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.Google.FirstRow+2) + ":Q",
 							Dimension: "ROWS",
 							Rows:      [][]interface{}{{"UPLOADED", time.Now().Format("2006-01-02 15:04:05"), reason}},
 						}, spreadsheetId)
@@ -328,7 +321,7 @@ func (receiver *ImportFormsUseCase) ImportForms(req request.ImportFormRequest, u
 					} else {
 						monitor.LogGoogleAPIRequestImportForm()
 						_, err = receiver.SpreadsheetWriter.UpdateRange(sheet.WriteRangeParams{
-							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.AppConfig.Google.FirstRow+2) + ":Q",
+							Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.Google.FirstRow+2) + ":Q",
 							Dimension: "ROWS",
 							Rows:      [][]interface{}{{"UPLOADED", time.Now().Format("2006-01-02 15:04:05"), reason}},
 						}, spreadsheetId)
@@ -411,7 +404,7 @@ func (receiver *ImportFormsUseCase) importSignUpForms(req request.ImportFormRequ
 	return nil
 }
 
-func (c *ImportFormsUseCase) importSignUpForm(spreadsheetUrl, note, sheetNameToRead string) (entity.SForm, error) {
+func (receiver *ImportFormsUseCase) importSignUpForm(spreadsheetUrl, note, sheetNameToRead string) (entity.SForm, error) {
 	re := regexp.MustCompile(`/spreadsheets/d/([a-zA-Z0-9-_]+)`)
 	match := re.FindStringSubmatch(spreadsheetUrl)
 
@@ -422,7 +415,7 @@ func (c *ImportFormsUseCase) importSignUpForm(spreadsheetUrl, note, sheetNameToR
 
 	spreadsheetId := match[1]
 	monitor.LogGoogleAPIRequestImportForm()
-	values, err := c.SpreadsheetReader.Get(sheet.ReadSpecificRangeParams{
+	values, err := receiver.SpreadsheetReader.Get(sheet.ReadSpecificRangeParams{
 		SpreadsheetId: spreadsheetId,
 		ReadRange:     sheetNameToRead + `!J11` + `:Q`,
 	})
@@ -452,7 +445,8 @@ func (c *ImportFormsUseCase) importSignUpForm(spreadsheetUrl, note, sheetNameToR
 				uniqueId = &id
 			}
 			item := parameters.RawQuestion{
-				QuestionId:        strings.ToUpper(note) + "_" + spreadsheetId + "_" + strconv.Itoa(index-1),
+				// QuestionId:        strings.ToUpper(note) + "_" + spreadsheetId + "_" + strconv.Itoa(index-1),
+				QuestionId:        uuid.NewString(),
 				Question:          row[3].(string),
 				Type:              row[2].(string),
 				Attributes:        strings.ReplaceAll(row[4].(string), "\n", ""),
@@ -466,7 +460,7 @@ func (c *ImportFormsUseCase) importSignUpForm(spreadsheetUrl, note, sheetNameToR
 		}
 	}
 
-	f, msg, err := c.CreateSignUpForm(parameters.SaveFormParams{
+	f, msg, err := receiver.CreateSignUpForm(parameters.SaveFormParams{
 		Note:           note,
 		Name:           formName,
 		SpreadsheetUrl: spreadsheetUrl,
@@ -474,7 +468,6 @@ func (c *ImportFormsUseCase) importSignUpForm(spreadsheetUrl, note, sheetNameToR
 		Password:       "",
 		RawQuestions:   rawQuestions,
 		SheetName:      sheetNameToRead,
-		SyncStrategy:   value.FormSyncStrategyOnSubmit,
 	})
 
 	if err != nil {
@@ -487,7 +480,7 @@ func (c *ImportFormsUseCase) importSignUpForm(spreadsheetUrl, note, sheetNameToR
 	return *f, nil
 }
 
-func (receiver *ImportFormsUseCase) importForm(code string, spreadsheetUrl string, password string, sheetName string, syncStrategy value.FormSyncStrategy) (string, error) {
+func (receiver *ImportFormsUseCase) importForm(code string, spreadsheetUrl string, password string, sheetName string) (string, error) {
 	re := regexp.MustCompile(`/spreadsheets/d/([a-zA-Z0-9-_]+)`)
 	match := re.FindStringSubmatch(spreadsheetUrl)
 
@@ -496,7 +489,7 @@ func (receiver *ImportFormsUseCase) importForm(code string, spreadsheetUrl strin
 	}
 
 	spreadsheetId := match[1]
-	var sheetNameToRead string = "Questions"
+	sheetNameToRead := "Questions"
 	if sheetName != "" {
 		sheetNameToRead = sheetName
 	}
@@ -530,7 +523,8 @@ func (receiver *ImportFormsUseCase) importForm(code string, spreadsheetUrl strin
 				enabled = value.QuestionForMobile_Disabled
 			}
 			item := parameters.RawQuestion{
-				QuestionId:        strings.ToUpper(code) + "_" + spreadsheetId + "_" + row[2].(string),
+				// QuestionId:        strings.ToUpper(code) + "_" + spreadsheetId + "_" + row[2].(string),
+				QuestionId:        uuid.NewString(),
 				Question:          row[4].(string),
 				Type:              row[3].(string),
 				Attributes:        strings.ReplaceAll(row[5].(string), "\n", ""),
@@ -552,7 +546,6 @@ func (receiver *ImportFormsUseCase) importForm(code string, spreadsheetUrl strin
 		Password:       password,
 		RawQuestions:   rawQuestions,
 		SheetName:      sheetNameToRead,
-		SyncStrategy:   syncStrategy,
 	})
 
 	return reason, err
@@ -675,7 +668,9 @@ func UnmarshalAttributes(rawQuestion parameters.RawQuestion, questionType value.
 		value.UserInformationValue4,
 		value.UserInformationValue5,
 		value.UserInformationValue6,
-		value.UserInformationValue7:
+		value.UserInformationValue7,
+
+		value.CameraSquareLens:
 		return "{}", nil
 	case value.QuestionDurationBackward,
 		value.QuestionShowPic,
@@ -759,7 +754,7 @@ func UnmarshalAttributes(rawQuestion parameters.RawQuestion, questionType value.
 
 		return `{"spreadsheet_id" : "` + match[1] + `"}`, nil
 	case value.QuestionMessageBox:
-		message := strings.Replace(rawQuestion.Attributes, "\n", "\\n", -1)
+		message := strings.ReplaceAll(rawQuestion.Attributes, "\n", "\\n")
 		jsonMsg := `{"value": "` + message + `"}`
 		return jsonMsg, nil
 	case value.QuestionWeb:
@@ -818,9 +813,10 @@ func UnmarshalAttributes(rawQuestion parameters.RawQuestion, questionType value.
 			return "", err
 		}
 		return string(result), nil
-	}
 
-	return `{"value": "` + rawQuestion.Attributes + `"}`, nil
+	default:
+		return `{"value": "` + rawQuestion.Attributes + `"}`, nil
+	}
 }
 
 func (receiver *ImportFormsUseCase) createForm(questions []entity.SQuestion, params parameters.SaveFormParams) (*entity.SForm, error) {
@@ -833,14 +829,14 @@ func (receiver *ImportFormsUseCase) createForm(questions []entity.SQuestion, par
 		var order = 0
 		var answerRequired = false
 		for _, rq := range params.RawQuestions {
-			if rq.QuestionId == question.QuestionId {
+			if rq.QuestionId == question.QuestionId.String() {
 				order = rq.RowNumber
 				answerRequired = strings.ToLower(rq.AnswerRequired) == "true"
 			}
 		}
 
 		formQuestions = append(formQuestions, request.CreateFormQuestionItem{
-			QuestionId:     question.QuestionId,
+			QuestionId:     question.QuestionId.String(),
 			Order:          order,
 			AnswerRequired: answerRequired,
 		})
@@ -865,7 +861,7 @@ func (receiver *ImportFormsUseCase) ImportFormsPartially(url string, sheetName s
 
 	values, err := receiver.SpreadsheetReader.Get(sheet.ReadSpecificRangeParams{
 		SpreadsheetId: spreadsheetId,
-		ReadRange:     sheetName + `!` + receiver.AppConfig.Google.FirstColumn + strconv.Itoa(receiver.Google.FirstRow+2) + `:AC`,
+		ReadRange:     sheetName + `!` + receiver.Google.FirstColumn + strconv.Itoa(receiver.Google.FirstRow+2) + `:AC`,
 	})
 	if err != nil {
 		log.Error(err)
@@ -884,7 +880,7 @@ func (receiver *ImportFormsUseCase) ImportFormsPartially(url string, sheetName s
 					log.Error(err)
 				} else {
 					_, err = receiver.SpreadsheetWriter.UpdateRange(sheet.WriteRangeParams{
-						Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.AppConfig.Google.FirstRow+2) + ":Q",
+						Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.Google.FirstRow+2) + ":Q",
 						Dimension: "ROWS",
 						Rows:      [][]interface{}{{"DELETED", time.Now().Format("2006-01-02 15:04:05"), ""}},
 					}, spreadsheetId)
@@ -899,7 +895,7 @@ func (receiver *ImportFormsUseCase) ImportFormsPartially(url string, sheetName s
 					log.Error(err)
 				} else {
 					_, err = receiver.SpreadsheetWriter.UpdateRange(sheet.WriteRangeParams{
-						Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.AppConfig.Google.FirstRow+2) + ":Q",
+						Range:     sheetName + "!O" + strconv.Itoa(rowNo+receiver.Google.FirstRow+2) + ":Q",
 						Dimension: "ROWS",
 						Rows:      [][]interface{}{{"DEACTIVATED", time.Now().Format("2006-01-02 15:04:05"), ""}},
 					}, spreadsheetId)
@@ -945,10 +941,6 @@ func (receiver *ImportFormsUseCase) ImportFormsPartially(url string, sheetName s
 				// outputSheetName := "Answers"
 				// if len(row) >= 18 {
 				// 	outputSheetName = row[17].(string)
-				// }
-				// syncStrategy := value.FormSyncStrategyOnSubmit
-				// if len(row) >= 19 {
-				// 	syncStrategy = value.GetFormSyncStrategyFromString(row[18].(string))
 				// }
 				// importErr, reason := receiver.importForm(row[0].(string), row[1].(string), row[2].(string), row[3].(string), submissionType, submissionSheetId, tabName, outputSheetName, syncStrategy)
 				// if importErr != nil {
